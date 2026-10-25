@@ -57,6 +57,18 @@ const serviceStats = computed(() =>
   })),
 )
 
+const topAttackers = computed(() => {
+  const map = new Map()
+  for (const e of events.value) {
+    const key = `${e.srcIp}|${e.country}`
+    const row = map.get(key) || { srcIp: e.srcIp, country: e.country, hits: 0, high: 0 }
+    row.hits += 1
+    if (e.severity === 'high') row.high += 1
+    map.set(key, row)
+  }
+  return [...map.values()].sort((a, b) => b.hits - a.hits).slice(0, 8)
+})
+
 function startSim() {
   mode.value = 'sim'
   if (!events.value.length) {
@@ -120,6 +132,14 @@ function ago(ts) {
       </div>
     </header>
 
+    <section class="geo-strip" aria-label="Attack geography (demo)">
+      <div v-for="row in topAttackers" :key="row.srcIp" class="geo-cell" :title="row.srcIp">
+        <span class="cc">{{ row.country }}</span>
+        <code>{{ row.srcIp }}</code>
+        <b>{{ row.hits }}</b>
+      </div>
+    </section>
+
     <section class="kpis">
       <div><b>{{ overview.events }}</b><span>Events</span></div>
       <div class="hot"><b>{{ overview.high }}</b><span>High</span></div>
@@ -143,7 +163,17 @@ function ago(ts) {
       </section>
 
       <aside class="panel">
-        <h2>Decoy services</h2>
+        <h2>Top attackers</h2>
+        <div v-for="(row, idx) in topAttackers" :key="'lb-' + row.srcIp" class="leader">
+          <span class="rank">#{{ idx + 1 }}</span>
+          <div>
+            <strong>{{ row.srcIp }}</strong>
+            <small>{{ row.country }} · {{ row.high }} high</small>
+          </div>
+          <b>{{ row.hits }}</b>
+        </div>
+
+        <h2 class="mt">Decoy services</h2>
         <div v-for="s in serviceStats" :key="s.id" class="svc">
           <div>
             <strong>{{ s.name }}</strong>
@@ -186,6 +216,25 @@ h1 { margin: 0; font-size: 1.55rem; letter-spacing: .04em; text-transform: upper
 .controls button {
   padding: 8px 12px; border-radius: 999px; border: 1px solid var(--line); font-weight: 600;
 }
+.geo-strip {
+  display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px;
+}
+.geo-cell {
+  flex: 0 0 auto; min-width: 120px; padding: 10px 12px; border-radius: 12px;
+  border: 1px solid var(--line); background: var(--panel); display: grid; gap: 4px;
+}
+.geo-cell .cc { font-family: var(--mono); color: var(--acid); font-size: .85rem; }
+.geo-cell code { font-size: .68rem; color: var(--muted); }
+.geo-cell b { font-family: var(--mono); color: var(--warn); font-size: .9rem; }
+.leader {
+  display: grid; grid-template-columns: 28px 1fr auto; gap: 8px; align-items: center;
+  padding: 8px 0; border-bottom: 1px solid rgba(42,51,32,.8);
+}
+.leader strong { display: block; font-size: .9rem; font-family: var(--mono); color: var(--acid); }
+.leader small { color: var(--faint); font-size: .72rem; }
+.leader b { font-family: var(--mono); color: var(--warn); }
+.rank { color: var(--faint); font-family: var(--mono); font-size: .75rem; }
+.mt { margin-top: 18px; }
 .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
 .kpis > div { padding: 12px 14px; border-radius: 12px; background: var(--panel); border: 1px solid var(--line); }
 .kpis b { display: block; font-family: var(--mono); font-size: 1.3rem; }
